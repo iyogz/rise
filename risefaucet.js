@@ -235,7 +235,7 @@ async function solveTurnstileCaptcha(axiosInstance, apiKey) {
     while (attempts < maxAttempts) {
       attempts++;
       await new Promise(resolve => setTimeout(resolve, 10000));
-      const resultResponse = await axiosInstance.get('https://2captcha.com/res.php', {
+      const resultResponse = await axiosInstance.get('https://api.brightdata.com/request', {
         params: { key: apiKey, action: 'get', id: taskId, json: 1 }
       });
       if (resultResponse.data.status === 1) {
