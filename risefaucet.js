@@ -222,7 +222,7 @@ function getRandomProxy(proxies) {
 async function solveTurnstileCaptcha(axiosInstance, apiKey) {
   printMessage('captcha', 'Solving CAPTCHA...');
   try {
-    const submitResponse = await axiosInstance.get('https://2captcha.com/in.php', {
+    const submitResponse = await axiosInstance.get('https://api.brightdata.com/request', {
       params: { key: apiKey, method: 'turnstile', sitekey: config.siteKey, pageurl: config.siteUrl, json: 1 }
     });
     if (submitResponse.data.status !== 1) {
