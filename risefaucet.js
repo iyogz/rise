@@ -77,7 +77,7 @@ function printHeader(text) {
 }
 
 async function collectUserInputs() {
-  const apiKey = await prompt2CaptchaApiKey();
+  const apiKey = await promptBrightDataApiKey(); // <- changed here
   printMessage('success', 'API key received!');
 
   const tokens = await promptTokens();
@@ -97,12 +97,12 @@ async function collectUserInputs() {
   });
 }
 
-async function prompt2CaptchaApiKey() {
+async function promptBrightDataApiKey() {
   return new Promise((resolve) => {
-    readline.question(`\n${emojis.key} 2Captcha API key: `, (apiKey) => {
+    readline.question(`\n${emojis.key} Bright Data API key: `, (apiKey) => {
       if (!apiKey || apiKey.trim() === '') {
         printMessage('error', 'API key cannot be empty!');
-        return prompt2CaptchaApiKey().then(resolve);
+        return promptBrightDataApiKey().then(resolve);
       }
       resolve(apiKey.trim());
     });
@@ -222,30 +222,51 @@ function getRandomProxy(proxies) {
 async function solveTurnstileCaptcha(axiosInstance, apiKey) {
   printMessage('captcha', 'Solving CAPTCHA...');
   try {
-    const submitResponse = await axiosInstance.get('https://api.brightdata.com/request', {
-      params: { key: apiKey, method: 'turnstile', sitekey: config.siteKey, pageurl: config.siteUrl, json: 1 }
+    // Submit CAPTCHA solve request to Bright Data
+    const submitResponse = await axiosInstance.post('https://api.brightdata.com/request', {
+      zone: 'web_unlocker1', // or your actual zone
+      url: config.siteUrl,    // site url where captcha is
+      type: 'turnstile',      // assuming you're solving Turnstile captcha
+      sitekey: config.siteKey,
+      pageurl: config.siteUrl,
+      smart: true,
+      format: 'json'
+    }, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
     });
-    if (submitResponse.data.status !== 1) {
-      throw new Error(`CAPTCHA submission failed: ${submitResponse.data.request}`);
+
+    if (!submitResponse.data || !submitResponse.data.request_id) {
+      throw new Error(`CAPTCHA submission failed: ${JSON.stringify(submitResponse.data)}`);
     }
-    const taskId = submitResponse.data.request;
+
+    const taskId = submitResponse.data.request_id;
     let captchaToken = null;
     let attempts = 0;
     const maxAttempts = 30;
+
     while (attempts < maxAttempts) {
       attempts++;
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      const resultResponse = await axiosInstance.get('https://api.brightdata.com/request', {
-        params: { key: apiKey, action: 'get', id: taskId, json: 1 }
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Bright Data recommends polling faster
+      const resultResponse = await axiosInstance.get(`https://api.brightdata.com/request/${taskId}`, {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`
+        }
       });
-      if (resultResponse.data.status === 1) {
-        captchaToken = resultResponse.data.request;
+
+      if (resultResponse.data.status === 'success') {
+        captchaToken = resultResponse.data.solution;
         printMessage('success', 'CAPTCHA solved!');
         break;
-      } else if (resultResponse.data.request !== 'CAPCHA_NOT_READY') {
-        throw new Error(`CAPTCHA failed: ${resultResponse.data.request}`);
+      } else if (resultResponse.data.status === 'pending') {
+        printMessage('info', `Waiting for CAPTCHA... attempt ${attempts}`);
+      } else {
+        throw new Error(`CAPTCHA solving failed: ${resultResponse.data.error}`);
       }
     }
+
     if (!captchaToken) throw new Error('CAPTCHA timeout');
     return captchaToken;
   } catch (error) {
@@ -253,6 +274,10 @@ async function solveTurnstileCaptcha(axiosInstance, apiKey) {
     throw error;
   }
 }
+
+    if (!captchaToken) throw new Error('CAPTCHA timeout');
+    return captchaToken;
+  } catch (error) {
 
 async function claimFaucet(wallet, captchaToken, axiosInstance, tokens) {
   try {
