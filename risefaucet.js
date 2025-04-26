@@ -275,10 +275,6 @@ async function solveTurnstileCaptcha(axiosInstance, apiKey) {
   }
 }
 
-    if (!captchaToken) throw new Error('CAPTCHA timeout');
-    return captchaToken;
-  } catch (error) {
-
 async function claimFaucet(wallet, captchaToken, axiosInstance, tokens) {
   try {
     const payload = { address: wallet.address, turnstileToken: captchaToken, tokens };
